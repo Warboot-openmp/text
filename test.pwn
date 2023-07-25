@@ -45,6 +45,14 @@ CMD:messageleveltoall(playerid, params[])
 	return COMMAND_OK;
 }
 
+public OnPlayerText(playerid, text[])
+{
+	new output[128 + 1]; // or whatever you want
+	Message_ParseMentions(output, text);
+	SendClientMessageToAll(0xFFFFFFAA, output);
+	return 1;
+}
+
 Message_ParseMentions(string:output[], const string:message[], len = sizeof(len))
 {
 	new 
