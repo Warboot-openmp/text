@@ -81,7 +81,7 @@ Message_ParseMentions(string:output[], const string:message[], len = sizeof(len)
 
 				// Do the replacement here
 				strdel(output, startPos, endPos);
-				strins(output, fixedTag, cur);
+				strins(output, fixedTag, startPos);
 			}
 		}
 	}
