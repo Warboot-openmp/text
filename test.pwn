@@ -45,6 +45,14 @@ CMD:messageleveltoall(playerid, params[])
 	return COMMAND_OK;
 }
 
+public OnPlayerText(playerid, text[])
+{
+	new output[128 + 1]; // or whatever you want
+	Message_ParseMentions(output, text);
+	SendClientMessageToAll(0xFFFFFFAA, output);
+	return 0;
+}
+
 Message_ParseMentions(string:output[], const string:message[], len = sizeof(len))
 {
 	new 
@@ -52,6 +60,7 @@ Message_ParseMentions(string:output[], const string:message[], len = sizeof(len)
 
 	strcopy(output, text, len);
 
+	new startPos = -1, endPos = -1;
 	if (!sscanf(text, "p<@>A<u>(-1)[12]", uids))
 	{
 		for (new i = 1; i < 12; i ++)
@@ -59,16 +68,15 @@ Message_ParseMentions(string:output[], const string:message[], len = sizeof(len)
 			printf("%d = %d", uids[i], i);
 			if (IsPlayerConnected(uids[i]))
 			{
-				new cur = -1;
-				cur = strfind(output, "@", .pos = cur + 1);
+				startPos = strfind(output, "@", .pos = startPos + 1);
 
-				if (cur == -1)
+				if (startPos == -1)
 				{
 					print("Unfortunately we cannot find more @ for some reason");
 					return 1;
 				}
 
-				new endPos = strfind(output, " ", .pos = cur + 1);
+				endPos = strfind(output, " ", .pos = startPos + 1);
 				if (endPos == -1)
 				{
 					endPos = strlen(output); // we're just going to assume that the endpos for the `@` is in the end of string
@@ -80,8 +88,8 @@ Message_ParseMentions(string:output[], const string:message[], len = sizeof(len)
 				format(fixedTag, sizeof(fixedTag), "{33BDFF}@%s{FFFFFF}", fixedTag);
 
 				// Do the replacement here
-				strdel(output, cur, endPos);
-				strins(output, fixedTag, cur);
+				strdel(output, startPos, endPos);
+				strins(output, fixedTag, startPos);
 			}
 		}
 	}
