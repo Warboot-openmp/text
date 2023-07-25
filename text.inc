@@ -4,10 +4,12 @@
 #define _warboot_texts_included
 
 #include <open.mp>
+#include <sscanf2>
+
 #include <YSI_Coding\y_hooks>
 #include <YSI_Coding\y_va>
 
-#include <Pawn.Regex>
+// #include <Pawn.Regex>
 
 // --
 // Naming compactibility
@@ -196,10 +198,61 @@ stock void: Message_SendToAll(MESSAGE_LEVEL: level, const string: str[], va_args
 // --
 // Mention
 // --
+stock bool: Message_ParseMentions(string: output[], const string: message[], mentionColor = 0x33BDFF, bool:mentionSound = true, len = sizeof(output))
+{
+    new 
+        uids[12];
+
+    strcopy(output, message, len);
+
+    new startPos = -1, endPos = -1;
+    if (sscanf(message, "p<@>A<u>(-1)[12]", uids))
+    {
+        return false;
+    }
+
+    for (new i = 1; i < 12; i ++)
+    {
+        printf("%d = %d", uids[i], i);
+        if (IsPlayerConnected(uids[i]))
+        {
+            startPos = strfind(output, "@", .pos = startPos + 1);
+
+            if (startPos == -1)
+            {
+                print("Unfortunately we cannot find more @ for some reason");
+                return false;
+            }
+
+            endPos = strfind(output, " ", .pos = startPos + 1);
+            if (endPos == -1)
+            {
+                endPos = strlen(output); // we're just going to assume that the endpos for the `@` is in the end of string
+            }
+
+            // cool trick to reuse variable
+            new string:fixedTag[48];
+            GetPlayerName(uids[i], fixedTag, MAX_PLAYER_NAME);
+            format(fixedTag, sizeof(fixedTag), "{%x}@%s{FFFFFF}", mentionColor, fixedTag);
+
+            // Do the replacement here
+            strdel(output, startPos, endPos);
+            strins(output, fixedTag, startPos, len);
+
+            if (mentionSound)
+            {
+                // Play "DING" message
+                PlayerPlaySound(uids[i], 17802, 0.0, 0.0, 0.0);
+            }
+        }
+    }
+    return true;
+}
 
 // --
 // Hashtag
 // --
+
 
 // --
 // Hooks
