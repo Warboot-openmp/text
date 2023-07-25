@@ -80,7 +80,7 @@ Message_ParseMentions(string:output[], const string:message[], len = sizeof(len)
 				format(fixedTag, sizeof(fixedTag), "{33BDFF}@%s{FFFFFF}", fixedTag);
 
 				// Do the replacement here
-				strdel(output, cur, endPos);
+				strdel(output, startPos, endPos);
 				strins(output, fixedTag, cur);
 			}
 		}
