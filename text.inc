@@ -219,7 +219,7 @@ stock bool: Message_ParseMention(playerid, string: output[], const string: messa
         if (posStart != -1)
         {
             new string:extractedString[32];
-            if (!(c == ',' || c == '.' || c == ' ' || c == '|' || c == '?' || c == '!' || c == EOS) || i == j))
+            if (!(c == ',' || c == '.' || c == ' ' || c == '?' || c == '!' || c == EOS) || i == j))
             {
                 continue;
             }
