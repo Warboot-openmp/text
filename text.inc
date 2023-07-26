@@ -204,7 +204,7 @@ stock void: Message_SendToAll(MESSAGE_LEVEL: level, const string: str[], va_args
 // Mention
 // --
 
-stock bool: Message_ParseMention(playerid, string: output[], const string: message[], mentionColor = 0x33BDFF, len = sizeof(output))
+stock bool: Message_ParseMention(string: output[], const string: message[], mentionColor = 0x33BDFF, senderid = INVALID_PLAYER_ID, len = sizeof(output))
 {
     if (IsNull(message))
     {
@@ -254,7 +254,7 @@ stock bool: Message_ParseMention(playerid, string: output[], const string: messa
             strdel(output, posStart, i);
             strins(output, playerName, posStart, len);
 
-            CallRemoteFunction(#OnPlayerMessageMentioned, "ii", playerIds, playerid);
+            CallRemoteFunction(#OnPlayerMessageMentioned, "ii", playerIds, senderid);
 
             // recalculate the loop size and skip
             i = posStart + nameLength + 1;
