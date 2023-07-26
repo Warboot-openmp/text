@@ -12,19 +12,23 @@
 // #include <Pawn.Regex>
 
 // --
-// Naming compactibility
+// Naming compatibility
 // --
 
 // --
 // Entry
 // --
 
-#define ERROR_MSG_COLOR         0xFC2C03FF
-#define WARNING_MSG_COLOR       0xFCE803FF
-#define SUCCESS_MSG_COLOR       0xA1FC03FF
-#define USAGE_MSG_COLOR         0xFC9003FF
-#define HELP_MSG_COLOR          0x75231DFF
-#define ANNOUNCEMENT_MSG_COLOR  0x688C8AFF
+#define ERROR_MSG_COLOR             0xFC2C03FF
+#define WARNING_MSG_COLOR           0xFCE803FF
+#define SUCCESS_MSG_COLOR           0xA1FC03FF
+#define USAGE_MSG_COLOR             0xFC9003FF
+#define HELP_MSG_COLOR              0x75231DFF
+#define ANNOUNCEMENT_MSG_COLOR      0x688C8AFF
+
+#if !defined MAX_MENTIONED_MESSAGE  
+    #define MAX_MENTIONED_MESSAGE   (3)
+#endif
 
 #define MESSAGE_LEVEL: __TAG(MESSAGE_LEVEL):
 enum MESSAGE_LEVEL:__MESSAGE_LEVEL
@@ -43,6 +47,7 @@ static stock MESSAGE_LEVEL:_@MESSAGE_LEVEL() { return __MESSAGE_LEVEL; }
 // --
 
 forward OnPlayerReceivePrivateMessage(playerid, receiverid, string:text[]);
+forward OnPlayerMessageMentioned(playerid, senderid);
 
 // --
 // API
@@ -198,53 +203,72 @@ stock void: Message_SendToAll(MESSAGE_LEVEL: level, const string: str[], va_args
 // --
 // Mention
 // --
-stock bool: Message_ParseMentions(string: output[], const string: message[], mentionColor = 0x33BDFF, bool:mentionSound = true, len = sizeof(output))
+
+stock bool: Message_ParseMention(playerid, string: output[], const string: message[], mentionColor = 0x33BDFF, len = sizeof(output))
 {
-    new 
-        uids[12];
-
-    strcopy(output, message, len);
-
-    new startPos = -1, endPos = -1;
-    if (sscanf(message, "p<@>A<u>(-1)[12]", uids))
+    if (IsNull(message))
     {
         return false;
     }
 
-    for (new i = 1; i < 12; i ++)
+    strcopy(output, message, len);
+
+    new posStart = -1, maxMentioned = 0;
+    for (new i = 0, j = strlen(output); i < j + 1; i ++)
     {
-        printf("%d = %d", uids[i], i);
-        if (IsPlayerConnected(uids[i]))
+        if (posStart != -1)
         {
-            startPos = strfind(output, "@", .pos = startPos + 1);
-
-            if (startPos == -1)
+            new string:extractedString[32];
+            if (!(c == ',' || c == '.' || c == ' ' || c == '?' || c == '!' || c == EOS) || i == j))
             {
-                print("Unfortunately we cannot find more @ for some reason");
-                return false;
+                continue;
             }
 
-            endPos = strfind(output, " ", .pos = startPos + 1);
-            if (endPos == -1)
+            if (maxMentioned >= MAX_MENTIONED_MESSAGE)
             {
-                endPos = strlen(output); // we're just going to assume that the endpos for the `@` is in the end of string
+                break;
             }
 
-            // cool trick to reuse variable
-            new string:fixedTag[48];
-            GetPlayerName(uids[i], fixedTag, MAX_PLAYER_NAME);
-            format(fixedTag, sizeof(fixedTag), "{%x}@%s{FFFFFF}", mentionColor, fixedTag);
+            strmid(extractedString, output, posStart + 1, i, len);
 
-            // Do the replacement here
-            strdel(output, startPos, endPos);
-            strins(output, fixedTag, startPos, len);
-
-            if (mentionSound)
+            new playerIds;
+            if (sscanf(extractedString, "r", playerIds))
             {
-                // Play "DING" message
-                PlayerPlaySound(uids[i], 17802, 0.0, 0.0, 0.0);
+                posStart = -1;
+                continue;
             }
+                
+            new playerName[35];
+            new nameLength;
+
+            nameLength = GetPlayerName(playerIds, playerName, MAX_PLAYER_NAME);
+
+            if (!nameLength)
+            {
+                printf("Error: Player %d might be leaving or he's having invalid name", playerIds);
+                continue;
+            }
+
+            format(playerName, sizeof(playerName), "{%x}@%s{FFFFFF}", mentionColor, playerName);
+
+            strdel(output, posStart, i);
+            strins(output, playerName, posStart, len);
+
+            CallRemoteFunction(#OnPlayerMessageMentioned, "ii", playerIds, playerid);
+
+            // recalculate the loop size and skip
+            i = posStart + nameLength + 1;
+            posStart = -1;
+            j = strlen(output);
+            maxMentioned ++;
+            continue;
         }
+        if (output[i] == '@' && posStart == -1)
+        {
+           posStart = i;
+           continue; 
+        }
+        
     }
     return true;
 }
