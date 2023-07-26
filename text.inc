@@ -12,19 +12,23 @@
 // #include <Pawn.Regex>
 
 // --
-// Naming compactibility
+// Naming compatibility
 // --
 
 // --
 // Entry
 // --
 
-#define ERROR_MSG_COLOR         0xFC2C03FF
-#define WARNING_MSG_COLOR       0xFCE803FF
-#define SUCCESS_MSG_COLOR       0xA1FC03FF
-#define USAGE_MSG_COLOR         0xFC9003FF
-#define HELP_MSG_COLOR          0x75231DFF
-#define ANNOUNCEMENT_MSG_COLOR  0x688C8AFF
+#define ERROR_MSG_COLOR             0xFC2C03FF
+#define WARNING_MSG_COLOR           0xFCE803FF
+#define SUCCESS_MSG_COLOR           0xA1FC03FF
+#define USAGE_MSG_COLOR             0xFC9003FF
+#define HELP_MSG_COLOR              0x75231DFF
+#define ANNOUNCEMENT_MSG_COLOR      0x688C8AFF
+
+#if !defined MAX_MENTIONED_MESSAGE  
+    #define MAX_MENTIONED_MESSAGE   (3)
+#endif
 
 #define MESSAGE_LEVEL: __TAG(MESSAGE_LEVEL):
 enum MESSAGE_LEVEL:__MESSAGE_LEVEL
