@@ -55,9 +55,6 @@ public OnPlayerText(playerid, text[])
 
 public OnPlayerMessageMentioned(playerid, senderid)
 {
-    if (mentionSound)
-    {
-        // Play "DING" message
-        PlayerPlaySound(playerid, 17802, 0.0, 0.0, 0.0);
-    }
+    // Play "DING" message
+    PlayerPlaySound(playerid, 17802, 0.0, 0.0, 0.0);
 }
