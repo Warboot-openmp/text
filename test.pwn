@@ -52,3 +52,12 @@ public OnPlayerText(playerid, text[])
 	SendClientMessageToAll(0xFFFFFFAA, output);
 	return 0;
 }
+
+public OnPlayerMessageMentioned(playerid, senderid)
+{
+    if (mentionSound)
+    {
+        // Play "DING" message
+        PlayerPlaySound(playerid, 17802, 0.0, 0.0, 0.0);
+    }
+}
