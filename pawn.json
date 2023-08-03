@@ -1,6 +1,10 @@
 {
 	"user": "Warboot-openmp",
 	"repo": "text",
+	"contributors": [
+		"Mergevos",
+		"ohmypxl"
+	],
 	"entry": "test.pwn",
 	"output": "test.amx",
 	"dependencies": [
@@ -8,6 +12,9 @@
 		"pawn-lang/samp-stdlib@open.mp",
 		"pawn-lang/pawn-stdlib@open.mp",
 		"pawn-lang/YSI-Includes@5.x",
-		"Y-Less/sscanf:v2.13.8"
+		"Y-Less/sscanf:v2.13.8",
+		"Southclaws/samp-logger:1.5.0",
+		"Southclaws/pawn-json:1.4.1",
+		"IS4Code/PawnPlus:1.4.1"
 	]
 }
