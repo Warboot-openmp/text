@@ -81,24 +81,6 @@ CMD:messagelevel(playerid, params[])
 	return Message_Send(playerid, MESSAGE_ANNOUNCEMENT, "Test %d", 35);
 }
 
-CMD:randomget(playerid, params[])
-{
-	SendClientMessage(playerid, -1, "Current is %d", Message_GetRandomPlayerStatus(playerid));
-	return COMMAND_OK;
-}
-
-CMD:randomon(playerid, params[])
-{
-	Message_SetRandomPlayerStatus(playerid, true);
-	return COMMAND_OK;
-}
-
-CMD:randomoff(playerid, params[])
-{
-	Message_SetRandomPlayerStatus(playerid, false);
-	return COMMAND_OK;
-}
- 
 CMD:messageleveltoall(playerid, params[])
 {
 	Message_SendToAll(MESSAGE_ERROR, "Test error %d %d", 44, 4444);

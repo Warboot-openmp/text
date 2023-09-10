@@ -9,13 +9,9 @@
 #include <YSI_Data\y_foreach> 
 #include <YSI_Coding\y_hooks>
 #include <YSI_Coding\y_va>
-#include <YSI_Coding\y_inline>
-#include <YSI_Extra\y_inline_timers>
-
-#define PP_SYNTAX_THREADED
-#include <PawnPlus>
 
 #include <json>
+#include <errors>
 #include <logger>
 
 #define __INC_VERSION__ "1.0.0"
@@ -108,13 +104,13 @@ forward OnPlayerMessageMentioned(playerid, senderid);
 // Settings
 // --
 
-stock bool: Text_Debug(bool: set)
+stock void: Text_Debug(bool: set)
 {
     Logger_ToggleDebug("__TEXT_DEBUG", set);
     Text_DebugLevel = set;
 }
 
-stock Text_SetConfiguration(TEXT_CONFIG: config, bool: value)
+stock void: Text_SetConfiguration(TEXT_CONFIG: config, bool: value)
 {
     Text_BooleanConfig[config] = value;
 }
@@ -140,21 +136,20 @@ stock bool: Message_CanPlayerReceivePrivate(playerid)
     return (GetPVarInt(playerid, "__TEXT_Receive") == 0 ? true : false);
 }
 
-stock bool: Message_BlockPrivate(playerid, bool: block)
+stock Error: Message_BlockPrivate(playerid, bool: block)
 {
 	if(!IsPlayerConnected(playerid))
 	{
         Logger_Dbg("__TEXT_DEBUG", "Player is not connected.", Logger_S("function", "Message_BlockPrivate"));
-		return false;
+		return Error(1, "Not connected");
 	}
     if(!Text_BooleanConfig[TEXT_CONFIG_ALLOW_PM_STATUS])
     {
-        CallLocalFunction("OnPlayerBlockPrivateMessages", "ii", playerid, false);
-        return false;
+        Logger_Dbg("__TEXT_DEBUG", "Player tried to bloc PMs.", Logger_I("playerid", playerid), Logger_S("player", ReturnPlayerName(playerid)));
+        return Error(2, "Modifying private message status is not allowed.");
     }
-    CallLocalFunction("OnPlayerBlockPrivateMessages", "ii", playerid, true);
 	SetPVarInt(playerid, "__TEXT_Receive", (block ? true : false));
-    return true;
+    return NoError();
 }
 
 stock bool: Message_AllowPlayerPrivate(playerid, bool: allow)
@@ -164,7 +159,7 @@ stock bool: Message_AllowPlayerPrivate(playerid, bool: allow)
         Logger_Dbg("__TEXT_DEBUG", "Player is not connected.", Logger_S("function", "Message_AllowPlayerPrivate"));
 		return false;
 	}
-	SetPVarInt(playerid, "__TEXT_AllowPrivate", (allow ? true : false));
+	SetPVarInt(playerid, "__TEXT_AllowPrivate", (allow ? 1 : 0));
     return true;
 }
 
@@ -178,16 +173,17 @@ stock bool: Message_CanPlayerSendPrivate(playerid)
     return (GetPVarInt(playerid, "__TEXT_AllowPrivate") == 1 ? true : false);
 }
 
-stock bool: Message_SendPrivate(playerid, forplayerid, color, const string: text[110])
+stock Error: Message_SendPrivate(playerid, forplayerid, color, const string: text[110])
 {
     if(!IsPlayerConnected(forplayerid))
 	{
         Logger_Dbg("__TEXT_DEBUG", "Player is not connected.", Logger_S("function", "Message_SendPrivate"));
-		return false;
+		return Error(1, "Not connected");
 	}
-    if(GetPVarInt(playerid, "__TEXT_Receive") == 1)
+    if(GetPVarInt(playerid, "__TEXT_Receive") == 0)
     {
-        return false;
+        Logger_Dbg("__TEXT_DEBUG", "Player can't receive PM", Logger_I("playerid", playerid), Logger_S("player", ReturnPlayerName(playerid)));
+        return Error(2, "Can't receive PM");
     } 
 	SendClientMessage(playerid, color, ">> %s(%i): %s", ReturnPlayerName(forplayerid), forplayerid, text);
 	SendClientMessage(forplayerid, color, "** %s(%i): %s", ReturnPlayerName(playerid), playerid, text);
@@ -195,7 +191,7 @@ stock bool: Message_SendPrivate(playerid, forplayerid, color, const string: text
     {
         CallRemoteFunction("OnPlayerReceivePrivateMessage", "iis", playerid, forplayerid, text);
     }
-    return true;
+    return NoError();
 }
 
 // --
@@ -392,19 +388,24 @@ stock bool: Message_RandomGet(RandomMessage: messageid, string: dest[], len = si
  * <summary>Sends random message to all. </summary>
  * <param name="color">Color of the message.</param>
  * <param name="time">Delay between messages.</param>
- * <param name="times">How many times to send message.</param>
+ * <param name="times">How many times to send message, 0 - forever.</param>
  * <seealso name="Message_SendRandomToClient" />
- * <returns>False if there are no any random messages, otherwise true.</returns>
+ * <returns>Error code 1 if iterator is empty (no messages), 2 if invalid count, 0 if successful.</returns>
  */
-stock bool: Message_SendRandomToAll(color, time, times = 1)
+stock Error: Message_SendRandomToAll(color, time, times = 0)
 {
-    if(Iter_IsEmpty(Messages_Iterator) || time < 1)
+    if(Iter_IsEmpty(Messages_Iterator))
     {
         Logger_Dbg("__TEXT_DEBUG", "Iterator is empty.", Logger_S("function", "Message_SendRandomToAll"));
-        return false;
+        return Error(1, "Empty iterator.");
+    }
+    if(times < 0)
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Invalid count, must be above or equal to 0", Logger_I("count", times), Logger_S("function", "Message_SendRandomToAll"));
+        return Error(2, "Invalid times input");
     }
     SetTimerEx("__text_randomSend", time, false, "iiiii", -1, color, 1, time, times);
-    return true;
+    return NoError();
 }
 
 /** 
@@ -415,39 +416,48 @@ stock bool: Message_SendRandomToAll(color, time, times = 1)
  * <param name="time">Delay between messages.</param>
  * <param name="times">How many times to send message.</param>
  * <seealso name="Message_SendRandomToClient" />
- * <returns>False if there are no any random messages, otherwise true.</returns>
+ * <returns>Error code 1 if iterator is empty (no messages), 2 if player is not connected, 0 if successful.</returns>
  */
-stock bool: Message_SendRandomToClient(playerid, color, time, times = 1)
+stock Error: Message_SendRandomToClient(playerid, color, time, times = 1)
 {
     if(Iter_IsEmpty(Messages_Iterator))
     {
         Logger_Dbg("__TEXT_DEBUG", "Iterator is empty.", Logger_S("function", "Message_SendRandomToClient"));
-        return false;
+        return Error(1, "Empty iterator.");
     }
     if(!IsPlayerConnected(playerid))
     {
         Logger_Dbg("__TEXT_DEBUG", "Player is not connected.", Logger_S("function", "Message_SendRandomToClient"));
-        return false;
+        return Error(2, "Not connected.");
     }
     SetTimerEx("__text_randomSend", time, false, "iiiii", playerid, color, 2, time, times);
-    return true;
+    return NoError();
 }
 
 // --
 // Mention
 // --
 
-stock bool: Message_ParseMention(string: output[], const string: message[], mentionColor = 0x33BDFF, senderid = INVALID_PLAYER_ID, len = sizeof(output))
+/** 
+ * <library>messages</library>
+ * <summary>Parses players' names instead @. </summary>
+ * <param name="output">Destination string.</param>
+ * <param name="message">Message to modify.</param>
+ * <param name="mentionColor">Color of tag.</param>
+ * <param name="senderid">Who mentioned player, e.g. who sent message.</param>
+ * <returns>Error code 1 if message is invalid, 2 if mentions are turned off, 0 if successful.</returns>
+ */
+stock Error: Message_ParseMention(string: output[], const string: message[], mentionColor = 0x33BDFF, senderid = INVALID_PLAYER_ID, len = sizeof(output))
 {
     if (IsNull(message))
     {   
         Logger_Dbg("__TEXT_DEBUG", "Message within function is null.", Logger_S("function", "Message_ParseMention"));
-        return false;
+        return Error(1, "Invalid message.");
     }
     if (Text_BooleanConfig[TEXT_CONFIG_ALLOW_MENTIONS])
     {
         Logger_Dbg("__TEXT_DEBUG", "Mentions aren't turned on.", Logger_S("function", "Message_ParseMention"));
-        return false;
+        return Error(2, "Mentions turned off.");
     }
     strcopy(output, message, len);
 
@@ -506,13 +516,20 @@ stock bool: Message_ParseMention(string: output[], const string: message[], ment
            continue; 
         }
     }
-    return true;
+    return NoError();
 }
 
 // --
 // Channels/chat groups
 // --
 
+/** 
+ * <library>messages</library>
+ * <summary>Creates a chat group.</summary>
+ * <param name="name">Name of the group.</param>
+ * <param name="maxmembers">Max members group can have.</param>
+ * <returns>Index of group if created, otherwise -1.</returns>
+ */
 stock ChatGroup: ChatGroup_Create(const string: name[], maxmembers = MAX_CHAT_GROUP_MEMBERS)
 {
     new ChatGroup: idx = ChatGroup: Iter_Alloc(Chat_Groups);
@@ -526,11 +543,23 @@ stock ChatGroup: ChatGroup_Create(const string: name[], maxmembers = MAX_CHAT_GR
     return idx;
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Checks if group is valid</summary>
+ * <param name="id">Id of the group.</param>
+ * <returns>True if valid, otherwise false.</returns>
+ */
 stock bool: ChatGroup_IsValid(ChatGroup: id)
 {
     return Iter_Contains(Chat_Groups, _:id);
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Deletes a group</summary>
+ * <param name="id">Id of the group.</param>
+ * <returns>True if deleted, otherwise false.</returns>
+ */
 stock bool: ChatGroup_Delete(ChatGroup: id)
 {
     if(!ChatGroup_IsValid(id))
@@ -544,43 +573,65 @@ stock bool: ChatGroup_Delete(ChatGroup: id)
     return true;
 }
 
-stock bool: ChatGroup_AddMember(ChatGroup: id, playerid)
+/** 
+ * <library>messages</library>
+ * <summary>Adds a member to the group</summary>
+ * <param name="id">Id of the group.</param>
+ * <param name="id">Player to add.</param>
+ * <returns>Error code 1 if channel is invalid, 2 if channel is full, 3 if channel already has a member, 0 if successful.</returns>
+ */
+stock Error: ChatGroup_AddMember(ChatGroup: id, playerid)
 {
     if(!ChatGroup_IsValid(id))
     {
         Logger_Dbg("__TEXT_DEBUG", "Invalid chat group.");
-        return false;
-    }
-    if(Iter_Contains(ChatGroup_Members[id], playerid))
-    {
-        Logger_Dbg("__TEXT_DEBUG", "Chat group already has member.", Logger_I("groupid", _:id), Logger_I("playerid", playerid));
-        return false;
+        return Error(1, "Invalid channel.");
     }
     if(Iter_Count(ChatGroup_Members[id]) >= ChatGroup_MaxMembers[id])
     {
         Logger_Dbg("__TEXT_DEBUG", "Chat group is full.", Logger_I("groupid", _:id), Logger_I("count", Iter_Count(ChatGroup_Members[id])), Logger_I("maxmembers", ChatGroup_MaxMembers[id]));
-        return false;
+        return Error(2, "Full channel");
+    }
+    if(Iter_Contains(ChatGroup_Members[id], playerid))
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Chat group already has member.", Logger_I("groupid", _:id), Logger_I("playerid", playerid));
+        return Error(3, "Channel already has member.");
     }
     Iter_Add(ChatGroup_Members[id], playerid);
-    return true;
+    return NoError();
 }
 
-stock bool: ChatGroup_RemoveMember(ChatGroup: id, playerid)
+/** 
+ * <library>messages</library>
+ * <summary>Removes a member from the group</summary>
+ * <param name="id">Id of the group.</param>
+ * <param name="id">Player to remove.</param>
+ * <returns>Error code 1 if channel is invalid, 2 if channel doesn't have the member, 0 if successful.</returns>
+ */
+stock Error: ChatGroup_RemoveMember(ChatGroup: id, playerid)
 {
     if(!ChatGroup_IsValid(id))
     {
         Logger_Dbg("__TEXT_DEBUG", "Invalid chat group.");
-        return false;
+        return Error(1, "Invalid channel.");
     }
     if(!Iter_Contains(ChatGroup_Members[id], playerid))
     {
         Logger_Dbg("__TEXT_DEBUG", "Chat group doesn't have the member.", Logger_I("groupid", _:id), Logger_I("playerid", playerid));
-        return false;
+        return Error(2, "Channel doesn't have the member.");
     }
     Iter_Remove(ChatGroup_Members[id], playerid);
-    return true;
+    return NoError();
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Sends a message to group.</summary>
+ * <param name="id">Id of the group.</param>
+ * <param name="color">Color of the message.</param>
+ * <param name="message">Message to send.</param>
+ * <returns>False if group is invalid, otherwise true.</returns>
+ */
 stock bool: ChatGroup_SendMessage(ChatGroup: id, color, const string: message[144])
 {
     if(!ChatGroup_IsValid(id))
