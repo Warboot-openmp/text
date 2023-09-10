@@ -10,20 +10,39 @@ main()
 }
 
 new RandomMessage: message1;
+new Channel: channeltest;
 
 public OnGameModeInit()
 {
-	Text_SetConfiguration(TEXT_CONFIG_CALL_OPMM, true);
-	Text_Log(TEXT_LOG_ALL, false);
 
 	new RandomMessage: message = Message_AddRandom("Hej ti, kisa mi niz lice {FF33AA}pada{FFFFFF}.");
 	message1 = Message_AddRandom("Hej ti, kisa mi niz lice {FF33AA}pada.");
-	printf("message %d", _:message1);
-	new bool:ret = Message_SendRandomToAll(-1, 6000, 5);
-	printf("return %d", ret);
+	Message_SendRandomToAll(-1, 11000, 5);
+	print("Testing");
+
+	channeltest = ChatGroup_Create("Test Channel");
+
 	return 1;
 }
 
+
+CMD:addto(playerid, params[])
+{
+	ChatGroup_AddMember(channeltest, playerid);
+	return 1;
+}
+
+CMD:removefrom(playerid, params[])
+{
+	ChatGroup_RemoveMember(channeltest, playerid);
+	return 1;
+}
+
+CMD:channelmsg(playerid, params[])
+{
+	ChatGroup_SendMessage(channeltest, 0xFFAAFFFF, "Text message");
+	return 1;
+}
 
 CMD:pm(playerid, params[])
 {
@@ -61,6 +80,24 @@ CMD:messagelevel(playerid, params[])
 {
 	return Message_Send(playerid, MESSAGE_ANNOUNCEMENT, "Test %d", 35);
 }
+
+CMD:randomget(playerid, params[])
+{
+	SendClientMessage(playerid, -1, "Current is %d", Message_GetRandomPlayerStatus(playerid));
+	return COMMAND_OK;
+}
+
+CMD:randomon(playerid, params[])
+{
+	Message_SetRandomPlayerStatus(playerid, true);
+	return COMMAND_OK;
+}
+
+CMD:randomoff(playerid, params[])
+{
+	Message_SetRandomPlayerStatus(playerid, false);
+	return COMMAND_OK;
+}
  
 CMD:messageleveltoall(playerid, params[])
 {
@@ -93,5 +130,6 @@ public OnPlayerSpawn(playerid)
 {
 
 	//Message_SendSpecificToClient(playerid, message1, -1, 5000, 3);
+	Message_SendRandomToClient(playerid, -1, 5000, 3);
 	return 1;
 }

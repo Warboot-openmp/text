@@ -9,14 +9,17 @@
 #include <YSI_Data\y_foreach> 
 #include <YSI_Coding\y_hooks>
 #include <YSI_Coding\y_va>
+#include <YSI_Coding\y_inline>
+#include <YSI_Extra\y_inline_timers>
 
+#define PP_SYNTAX_THREADED
 #include <PawnPlus>
 
 #include <json>
 #include <logger>
 
 #define __INC_VERSION__ "1.0.0"
-
+// do proper logging settings and summary
 // --
 // Naming compatibility
 // --
@@ -48,6 +51,22 @@ static
     Random_MessageText[RandomMessage:MAX_RANDOM_MESSAGES][MAX_RANDOM_MESSAGE_SIZE],
     Iterator: Messages_Iterator<MAX_RANDOM_MESSAGES>;
 
+#if !defined MAX_CHAT_GROUPS
+    #define MAX_CHAT_GROUPS 5
+#endif
+
+#if !defined MAX_CHAT_GROUP_MEMBERS
+    #define MAX_CHAT_GROUP_MEMBERS 30
+#endif
+
+#define ChatGroup: Channel: 
+
+static 
+    ChatGroup_Name[ChatGroup: MAX_CHAT_GROUPS][30],
+    ChatGroup_MaxMembers[ChatGroup: MAX_CHAT_GROUPS],
+    Iterator: Chat_Groups<MAX_CHAT_GROUPS>,
+    Iterator: ChatGroup_Members[ChatGroup: MAX_CHAT_GROUPS]<MAX_CHAT_GROUP_MEMBERS>;
+
 #define MESSAGE_LEVEL: __TAG(MESSAGE_LEVEL):
 enum MESSAGE_LEVEL:__MESSAGE_LEVEL
 {
@@ -65,23 +84,13 @@ enum TEXT_CONFIG:__TEXT_CONFIG
 {
     TEXT_CONFIG_CALL_OPMM,
     TEXT_CONFIG_CALL_OPRPM,
-    TEXT_CONFIG_ALLOW_MENTIONS
+    TEXT_CONFIG_ALLOW_MENTIONS,
+    TEXT_CONFIG_ALLOW_PM_STATUS
 }
 static stock TEXT_CONFIG:_@TEXT_CONFIG() { return __TEXT_CONFIG; } 
 
-#define TEXT_LOG_OPTION: __TAG(TEXT_LOG_OPTION):
-enum TEXT_LOG_OPTION:__TEXT_LOG_OPTION(<<=1)
-{
-    TEXT_LOG_NONE = 0,
-    TEXT_LOG_WARNINGS = 1,
-    TEXT_LOG_ERRORS, 
-    TEXT_LOG_DEBUG,
-    TEXT_LOG_ALL = TEXT_LOG_WARNINGS | TEXT_LOG_ERRORS | TEXT_LOG_DEBUG
-}
-static stock TEXT_LOG_OPTION:_@TEXT_LOG_OPTION() { return __TEXT_LOG_OPTION; } 
-
 static 
-    TEXT_LOG_OPTION: Text_LogLevel,
+    bool: Text_DebugLevel,
     bool: Text_BooleanConfig[TEXT_CONFIG:__TEXT_CONFIG];
 
 // --
@@ -99,16 +108,10 @@ forward OnPlayerMessageMentioned(playerid, senderid);
 // Settings
 // --
 
-stock void: Text_Log(TEXT_LOG_OPTION: option, bool: set)
+stock bool: Text_Debug(bool: set)
 {
-    if(set) 
-    {
-        Text_LogLevel |= option;
-    }
-    else if(!set)
-    {
-        Text_LogLevel &= ~option;
-    }
+    Logger_ToggleDebug("__TEXT_DEBUG", set);
+    Text_DebugLevel = set;
 }
 
 stock Text_SetConfiguration(TEXT_CONFIG: config, bool: value)
@@ -134,8 +137,7 @@ stock bool: Message_CanPlayerReceivePrivate(playerid)
         Logger_Dbg("__TEXT_DEBUG", "Player is not connected.", Logger_S("function", "Message_CanPlayerReceivePrivate"));
 		return false;
 	}
-    Logger_Dbg("__TEXT_DEBUG", "Function executed successfully", Logger_S("player", ReturnPlayerName(playerid)), Logger_S("function", "Message_CanPlayerReceivePrivate"));
-	return (GetPVarInt(playerid, "__TEXT_Receive") == 0 ? true : false);
+    return (GetPVarInt(playerid, "__TEXT_Receive") == 0 ? true : false);
 }
 
 stock bool: Message_BlockPrivate(playerid, bool: block)
@@ -145,9 +147,14 @@ stock bool: Message_BlockPrivate(playerid, bool: block)
         Logger_Dbg("__TEXT_DEBUG", "Player is not connected.", Logger_S("function", "Message_BlockPrivate"));
 		return false;
 	}
+    if(!Text_BooleanConfig[TEXT_CONFIG_ALLOW_PM_STATUS])
+    {
+        CallLocalFunction("OnPlayerBlockPrivateMessages", "ii", playerid, false);
+        return false;
+    }
+    CallLocalFunction("OnPlayerBlockPrivateMessages", "ii", playerid, true);
 	SetPVarInt(playerid, "__TEXT_Receive", (block ? true : false));
-    Logger_Dbg("__TEXT_DEBUG", "Function executed successfully", Logger_S("player", ReturnPlayerName(playerid)), Logger_S("function", "Message_BlockPrivate"));
-	return true;
+    return true;
 }
 
 stock bool: Message_AllowPlayerPrivate(playerid, bool: allow)
@@ -158,8 +165,7 @@ stock bool: Message_AllowPlayerPrivate(playerid, bool: allow)
 		return false;
 	}
 	SetPVarInt(playerid, "__TEXT_AllowPrivate", (allow ? true : false));
-    Logger_Dbg("__TEXT_DEBUG", "Function executed successfully", Logger_S("player", ReturnPlayerName(playerid)), Logger_S("function", "Message_AllowPlayerPrivate"));
-	return true;
+    return true;
 }
 
 stock bool: Message_CanPlayerSendPrivate(playerid)
@@ -169,8 +175,7 @@ stock bool: Message_CanPlayerSendPrivate(playerid)
         Logger_Dbg("__TEXT_DEBUG", "Player is not connected.", Logger_S("function", "Message_CanPlayerSendPrivate"));
 		return false;
 	}
-    Logger_Dbg("__TEXT_DEBUG", "Function executed successfully", Logger_S("player", ReturnPlayerName(playerid)), Logger_S("function", "Message_CanPlayerSendPrivate"));
-	return (GetPVarInt(playerid, "__TEXT_AllowPrivate") == 1 ? true : false);
+    return (GetPVarInt(playerid, "__TEXT_AllowPrivate") == 1 ? true : false);
 }
 
 stock bool: Message_SendPrivate(playerid, forplayerid, color, const string: text[110])
@@ -190,8 +195,7 @@ stock bool: Message_SendPrivate(playerid, forplayerid, color, const string: text
     {
         CallRemoteFunction("OnPlayerReceivePrivateMessage", "iis", playerid, forplayerid, text);
     }
-    Logger_Dbg("__TEXT_DEBUG", "Function executed successfully", Logger_S("player", ReturnPlayerName(playerid)), Logger_S("function", "Message_SendPrivate"));
-	return true;
+    return true;
 }
 
 // --
@@ -255,7 +259,6 @@ stock bool: Message_Send(playerid, MESSAGE_LEVEL: level, const string: str[], ..
     }
     va_format(va_string, sizeof(va_string), "%s%s", info, str);
     SendClientMessage(playerid, color, va_string, ___(3));
-    Logger_Dbg("__TEXT_DEBUG", "Function executed successfully.", Logger_S("player", ReturnPlayerName(playerid)), Logger_S("function", "Message_Send"));
     return true;
 }
 
@@ -309,28 +312,44 @@ stock void: Message_SendToAll(MESSAGE_LEVEL: level, const string: str[], va_args
     }
     va_format(va_string, sizeof(va_string), "%s%s", info, str);
     SendClientMessageToAll(color, va_string, ___(2));
-    Logger_Dbg("__TEXT_DEBUG", "Function executed successfully.", Logger_S("function", "Message_SendToAll"));
-
+    
 }
 
 // --
 // Random
 // --
+
+/** 
+ * <library>messages</library>
+ * <summary>Creates a random message. </summary>
+ * <param name="message">Message text.</param>
+ * <seealso name="Message_DeleteRandom" />
+ * <returns>Index if created, otherwise -1.</returns>
+ */
 stock RandomMessage: Message_AddRandom(const string: message[MAX_RANDOM_MESSAGE_SIZE])
 {
     new RandomMessage: idx = RandomMessage: Iter_Alloc(Messages_Iterator);
     if(idx == RandomMessage: INVALID_ITERATOR_SLOT)
     {
+        Logger_Dbg("__TEXT_DEBUG", "Invalid iterator slot.", Logger_S("function", "Message_AddRandom"));
         return RandomMessage: -1;
     }
     strcopy(Random_MessageText[idx], message);
     return idx;
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Deletes a random message. </summary>
+ * <param name="id">ID of message to delete.</param>
+ * <seealso name="Message_AddRandom" />
+ * <returns>Index if created, otherwise -1.</returns>
+ */
 stock bool: Message_DeleteRandom(RandomMessage: id)
 {
     if(!Iter_Contains(Messages_Iterator, Random_MessageText[idx]))
     {
+        Logger_Dbg("__TEXT_DEBUG", "Message doesn't exist.", Logger_S("function", "Message_DeleteRandom"));
         return false;
     }
     Random_MessageText[id][0] = EOS;
@@ -338,15 +357,29 @@ stock bool: Message_DeleteRandom(RandomMessage: id)
     return true;
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Returns number of created messages.</summary>
+ * <returns>Number of created messages.</returns>
+ */
 stock Message_GetNumber()
 {
     return Iter_Count(Messages_Iterator);
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Gets random message text. </summary>
+ * <param name="messageid">Message to get.</param>
+ * <param name="dest">String destination.</param>
+ * <seealso name="Message_DeleteRandom" />
+ * <returns>Index if created, otherwise -1.</returns>
+ */
 stock bool: Message_RandomGet(RandomMessage: messageid, string: dest[], len = sizeof(dest))
 {
     if(!Iter_Contains(Messages_Iterator, _:messageid))
     {
+        Logger_Dbg("__TEXT_DEBUG", "Message doesn't exist.", Logger_S("function", "Message_RandomGet"));
         return false;
     }
     new rdx = Iter_Random(Messages_Iterator);
@@ -354,78 +387,51 @@ stock bool: Message_RandomGet(RandomMessage: messageid, string: dest[], len = si
     return true;
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Sends random message to all. </summary>
+ * <param name="color">Color of the message.</param>
+ * <param name="time">Delay between messages.</param>
+ * <param name="times">How many times to send message.</param>
+ * <seealso name="Message_SendRandomToClient" />
+ * <returns>False if there are no any random messages, otherwise true.</returns>
+ */
 stock bool: Message_SendRandomToAll(color, time, times = 1)
 {
     if(Iter_IsEmpty(Messages_Iterator) || time < 1)
     {
+        Logger_Dbg("__TEXT_DEBUG", "Iterator is empty.", Logger_S("function", "Message_SendRandomToAll"));
         return false;
     }
-    while(times != 0)
-    {
-        wait_ms(time);
-        new RandomMessage: rndx = RandomMessage: Iter_Random(Messages_Iterator);
-        SendClientMessageToAll(color, Random_MessageText[rndx]);
-        times--;
-    }
+    SetTimerEx("__text_randomSend", time, false, "iiiii", -1, color, 1, time, times);
     return true;
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Sends random message to player. </summary>
+ * <param name="playerid">Player to send message to.</param>
+ * <param name="color">Color of the message.</param>
+ * <param name="time">Delay between messages.</param>
+ * <param name="times">How many times to send message.</param>
+ * <seealso name="Message_SendRandomToClient" />
+ * <returns>False if there are no any random messages, otherwise true.</returns>
+ */
 stock bool: Message_SendRandomToClient(playerid, color, time, times = 1)
 {
     if(Iter_IsEmpty(Messages_Iterator))
     {
+        Logger_Dbg("__TEXT_DEBUG", "Iterator is empty.", Logger_S("function", "Message_SendRandomToClient"));
         return false;
     }
     if(!IsPlayerConnected(playerid))
     {
+        Logger_Dbg("__TEXT_DEBUG", "Player is not connected.", Logger_S("function", "Message_SendRandomToClient"));
         return false;
     }
-    while(times != 0)
-    {
-        wait_ms(time);
-        new RandomMessage: rndx = RandomMessage: Iter_Random(Messages_Iterator);
-        SendClientMessage(playerid, color, Random_MessageText[rndx]);
-        times--;
-    }
+    SetTimerEx("__text_randomSend", time, false, "iiiii", playerid, color, 2, time, times);
     return true;
 }
-
-
-stock bool: Message_SendSpecificToClient(playerid, RandomMessage: id, color, time, times = 1)
-{
-    if(!Iter_Contains(Messages_Iterator, _:id))
-    {
-        return false;
-    }
-    if(!IsPlayerConnected(playerid))
-    {
-        return false;
-    }
-    inline sendMessage()
-    {
-        SendClientMessage(playerid, color, Random_MessageText[id]);
-    }
-    Timer_CreateCallback(using inline sendMessage, time, times);
-    return true;
-}
-
-stock bool: Message_SendSpecificToAll(playerid, RandomMessage: id, color, time, times = 1)
-{
-    if(!Iter_Contains(Messages_Iterator, _:id))
-    {
-        return false;
-    }
-    while(times != 0)
-    {
-        wait_ms(time);
-        new RandomMessage: rndx = RandomMessage: Iter_Random(Messages_Iterator);
-        SendClientMessageToAll(color, Random_MessageText[id]);
-        times--;
-    }
-
-    return true;
-}
-
 
 // --
 // Mention
@@ -436,6 +442,11 @@ stock bool: Message_ParseMention(string: output[], const string: message[], ment
     if (IsNull(message))
     {   
         Logger_Dbg("__TEXT_DEBUG", "Message within function is null.", Logger_S("function", "Message_ParseMention"));
+        return false;
+    }
+    if (Text_BooleanConfig[TEXT_CONFIG_ALLOW_MENTIONS])
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Mentions aren't turned on.", Logger_S("function", "Message_ParseMention"));
         return false;
     }
     strcopy(output, message, len);
@@ -478,8 +489,10 @@ stock bool: Message_ParseMention(string: output[], const string: message[], ment
 
             strdel(output, posStart, i);
             strins(output, playerName, posStart, len);
-            CallRemoteFunction(#OnPlayerMessageMentioned, "ii", playerIds, senderid);
-
+            if(Text_BooleanConfig[TEXT_CONFIG_CALL_OPMM])
+            {
+                CallRemoteFunction("OnPlayerMessageMentioned", "ii", playerIds, senderid);
+            }
             // recalculate the loop size and skip
             i = posStart + nameLength + 1;
             posStart = -1;
@@ -497,12 +510,97 @@ stock bool: Message_ParseMention(string: output[], const string: message[], ment
 }
 
 // --
+// Channels/chat groups
+// --
+
+stock ChatGroup: ChatGroup_Create(const string: name[], maxmembers = MAX_CHAT_GROUP_MEMBERS)
+{
+    new ChatGroup: idx = ChatGroup: Iter_Alloc(Chat_Groups);
+    if(idx == ChatGroup: INVALID_ITERATOR_SLOT)
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Couldn't create chat group.");
+        return ChatGroup: -1;
+    }
+    strcopy(ChatGroup_Name[idx], name);
+    ChatGroup_MaxMembers[idx] = maxmembers;
+    return idx;
+}
+
+stock bool: ChatGroup_IsValid(ChatGroup: id)
+{
+    return Iter_Contains(Chat_Groups, _:id);
+}
+
+stock bool: ChatGroup_Delete(ChatGroup: id)
+{
+    if(!ChatGroup_IsValid(id))
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Invalid chat group.");
+        return false;
+    }
+    strdel(ChatGroup_Name[id], 0, strlen(ChatGroup_Name[id]));
+    Iter_Clear(ChatGroup_Members[id]);
+    Iter_Remove(Chat_Groups, id);
+    return true;
+}
+
+stock bool: ChatGroup_AddMember(ChatGroup: id, playerid)
+{
+    if(!ChatGroup_IsValid(id))
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Invalid chat group.");
+        return false;
+    }
+    if(Iter_Contains(ChatGroup_Members[id], playerid))
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Chat group already has member.", Logger_I("groupid", _:id), Logger_I("playerid", playerid));
+        return false;
+    }
+    if(Iter_Count(ChatGroup_Members[id]) >= ChatGroup_MaxMembers[id])
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Chat group is full.", Logger_I("groupid", _:id), Logger_I("count", Iter_Count(ChatGroup_Members[id])), Logger_I("maxmembers", ChatGroup_MaxMembers[id]));
+        return false;
+    }
+    Iter_Add(ChatGroup_Members[id], playerid);
+    return true;
+}
+
+stock bool: ChatGroup_RemoveMember(ChatGroup: id, playerid)
+{
+    if(!ChatGroup_IsValid(id))
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Invalid chat group.");
+        return false;
+    }
+    if(!Iter_Contains(ChatGroup_Members[id], playerid))
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Chat group doesn't have the member.", Logger_I("groupid", _:id), Logger_I("playerid", playerid));
+        return false;
+    }
+    Iter_Remove(ChatGroup_Members[id], playerid);
+    return true;
+}
+
+stock bool: ChatGroup_SendMessage(ChatGroup: id, color, const string: message[144])
+{
+    if(!ChatGroup_IsValid(id))
+    {
+        Logger_Dbg("__TEXT_DEBUG", "Invalid chat group.");
+        return false;
+    }
+    foreach(new i : ChatGroup_Members[id])
+    {
+        SendClientMessage(i, color, message);
+    }
+    return true;
+}
+
+// --
 static stock bool: json_Parse()
 {
     new 
         Node: node,
-        bool: data,
-        TEXT_LOG_OPTION: option;
+        bool: data;
 
     new ret;
 
@@ -513,18 +611,14 @@ static stock bool: json_Parse()
         return false;
     }
 
-    ret = JSON_GetInt(node, "logging", _:option);
+    ret = JSON_GetBool(node, "debugging", data);
     if(ret)
     {
         Logger_Log("Couldn't find key.", Logger_S("key", "logging"));
         return false;
     }
-    Text_LogLevel = option;
-    if(Text_LogLevel & TEXT_LOG_DEBUG) 
-    {
-        Logger_ToggleDebug("__TEXT_DEBUG", true);
-        Logger_Dbg("__TEXT_DEBUG", "Debugger turned on.");
-    }
+    Text_DebugLevel = data;
+    Logger_ToggleDebug("__TEXT_DEBUG", data);
 
     Logger_Dbg("__TEXT_DEBUG", "Parsing data from file...", Logger_S("file", "text.json"));
 
@@ -558,6 +652,16 @@ static stock bool: json_Parse()
     Text_BooleanConfig[TEXT_CONFIG_CALL_OPRPM] = data;
     Logger_Dbg("__TEXT_DEBUG", "Successfully parsed option.", Logger_S("option", "call_oprpm"));
 
+    Logger_Dbg("__TEXT_DEBUG", "Parsing option.", Logger_S("option", "allow_private_msgs_status"));
+    ret = JSON_GetBool(node, "allow_private_msgs_status", data);
+    if(ret)
+    {
+        Logger_Log("Couldn't parse option.", Logger_S("option", "allow_private_msgs_status"));
+        return false;
+    }
+    Text_BooleanConfig[TEXT_CONFIG_ALLOW_PM_STATUS] = data;
+    Logger_Dbg("__TEXT_DEBUG", "Successfully parsed option.", Logger_S("option", "allow_private_msgs_status"));
+
     Logger_Dbg("__TEXT_DEBUG", "Finished parsing from file.", Logger_S("file", "text.json"));
     printf("[warboot-text-module] Version %s successfully loaded.", __INC_VERSION__);
     return true;
@@ -567,12 +671,12 @@ static stock json_Save()
 {
     Logger_Dbg("__TEXT_DEBUG", "Storing data to file...", Logger_S("file", "text.json"));
     new Node:node = JSON_Object(
-        "logging", JSON_Int(Text_LogLevel),
+        "debugging", JSON_Bool(Text_DebugLevel),
         "call_opmm", JSON_Bool(bool:Text_BooleanConfig[TEXT_CONFIG_CALL_OPMM]),
         "allow_mentions", JSON_Bool(bool:Text_BooleanConfig[TEXT_CONFIG_ALLOW_MENTIONS]),
-        "call_oprpm", JSON_Bool(bool:Text_BooleanConfig[TEXT_CONFIG_CALL_OPRPM])
+        "call_oprpm", JSON_Bool(bool:Text_BooleanConfig[TEXT_CONFIG_CALL_OPRPM]),
+        "allow_private_msgs_status", JSON_Bool(bool:Text_BooleanConfig[TEXT_CONFIG_ALLOW_PM_STATUS])
     ); 
-    Logger_Dbg("__TEXT_DEBUG", "Successfully created node.");
     JSON_SaveFile("text.json", node, true);
     Logger_Dbg("__TEXT_DEBUG", "Successfully stored.", Logger_S("file", "text.json"));
 }
@@ -590,6 +694,35 @@ static stock text_GetConfigName(TEXT_CONFIG: config, string: dest[], len = sizeo
     else if(config == TEXT_CONFIG_CALL_OPRPM)
     {
         strcopy(dest, "call_oprpm");
+    }
+    else if(config == TEXT_CONFIG_ALLOW_PM_STATUS)
+    {
+        strcopy(dest, "allow_private_msgs_status");
+    }
+}
+
+forward __text_randomSend(playerid, color, type, time, times);
+public __text_randomSend(playerid, color, type, time, times)
+{
+    if(type == 1)
+    {
+        if(times != 0)
+        {
+            new RandomMessage: rndx = RandomMessage: Iter_Random(Messages_Iterator);
+            SendClientMessageToAll(-1, Random_MessageText[rndx]);
+            times --;
+            SetTimerEx("__text_randomSend", time, false, "iiiii", -1, color, 1, time, times);
+        }
+    }
+    if(type == 2)
+    {
+        if(times != 0)
+        {
+            new RandomMessage: rndx = RandomMessage: Iter_Random(Messages_Iterator);
+            SendClientMessageToAll(-1, Random_MessageText[rndx]);
+            times --;
+            SetTimerEx("__text_randomSend", time, false, "iiiii", playerid, color, 2, time, times);        
+        }
     }
 }
 
