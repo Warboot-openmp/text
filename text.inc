@@ -38,6 +38,7 @@
 #define USAGE_MSG_COLOR             0xFC9003FF
 #define HELP_MSG_COLOR              0x75231DFF
 #define ANNOUNCEMENT_MSG_COLOR      0x688C8AFF
+#define DEBUG_MSG_COLOR             0x326376FF
 
 #if !defined MAX_MENTIONED_MESSAGE  
     #define MAX_MENTIONED_MESSAGE   (3)
@@ -71,7 +72,8 @@ enum MESSAGE_LEVEL:__MESSAGE_LEVEL
     MESSAGE_USAGE,
     MESSAGE_HELP,
     MESSAGE_SUCCESS,
-    MESSAGE_ANNOUNCEMENT
+    MESSAGE_ANNOUNCEMENT,
+    MESSAGE_DEBUG
 }
 static stock MESSAGE_LEVEL:_@MESSAGE_LEVEL() { return __MESSAGE_LEVEL; } 
 
@@ -149,7 +151,7 @@ stock Error: Message_BlockPrivate(playerid, bool: block)
         return Error(2, "Modifying private message status is not allowed.");
     }
 	SetPVarInt(playerid, "__TEXT_Receive", (block ? true : false));
-    return NoError();
+    return Ok();
 }
 
 stock bool: Message_AllowPlayerPrivate(playerid, bool: allow)
@@ -191,7 +193,7 @@ stock Error: Message_SendPrivate(playerid, forplayerid, color, const string: tex
     {
         CallRemoteFunction("OnPlayerReceivePrivateMessage", "iis", playerid, forplayerid, text);
     }
-    return NoError();
+    return Ok();
 }
 
 // --
@@ -252,6 +254,11 @@ stock bool: Message_Send(playerid, MESSAGE_LEVEL: level, const string: str[], ..
 			info = ">> Announcement: ";
             color = ANNOUNCEMENT_MSG_COLOR;
         }
+        case MESSAGE_DEBUG:
+        {
+			info = ">> Debug: ";
+            color = DEBUG_MSG_COLOR;
+        }
     }
     va_format(va_string, sizeof(va_string), "%s%s", info, str);
     SendClientMessage(playerid, color, va_string, ___(3));
@@ -304,6 +311,11 @@ stock void: Message_SendToAll(MESSAGE_LEVEL: level, const string: str[], va_args
         {
 			info = ">> Announcement: ";
             color = ANNOUNCEMENT_MSG_COLOR;
+        }
+        case MESSAGE_DEBUG:
+        {
+			info = ">> Debug: ";
+            color = DEBUG_MSG_COLOR;
         }
     }
     va_format(va_string, sizeof(va_string), "%s%s", info, str);
@@ -405,7 +417,7 @@ stock Error: Message_SendRandomToAll(color, time, times = 0)
         return Error(2, "Invalid times input");
     }
     SetTimerEx("__text_randomSend", time, false, "iiiii", -1, color, 1, time, times);
-    return NoError();
+    return Ok();
 }
 
 /** 
@@ -431,7 +443,7 @@ stock Error: Message_SendRandomToClient(playerid, color, time, times = 1)
         return Error(2, "Not connected.");
     }
     SetTimerEx("__text_randomSend", time, false, "iiiii", playerid, color, 2, time, times);
-    return NoError();
+    return Ok();
 }
 
 // --
@@ -516,7 +528,7 @@ stock Error: Message_ParseMention(string: output[], const string: message[], men
            continue; 
         }
     }
-    return NoError();
+    return Ok();
 }
 
 // --
@@ -598,7 +610,7 @@ stock Error: ChatGroup_AddMember(ChatGroup: id, playerid)
         return Error(3, "Channel already has member.");
     }
     Iter_Add(ChatGroup_Members[id], playerid);
-    return NoError();
+    return Ok();
 }
 
 /** 
@@ -621,7 +633,7 @@ stock Error: ChatGroup_RemoveMember(ChatGroup: id, playerid)
         return Error(2, "Channel doesn't have the member.");
     }
     Iter_Remove(ChatGroup_Members[id], playerid);
-    return NoError();
+    return Ok();
 }
 
 /** 
