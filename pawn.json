@@ -16,11 +16,5 @@
 		"Southclaws/samp-logger",
 		"Southclaws/pawn-json:1.4.1",
 		"Southclaws/pawn-errors"
-	],
-	"runtime": {
-		"version": "0.3.7",
-		"mode": "server",
-		"rcon_password": "password",
-		"port": 7777
-	}
+	]
 }

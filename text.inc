@@ -106,17 +106,36 @@ forward OnPlayerMessageMentioned(playerid, senderid);
 // Settings
 // --
 
+/** 
+ * <library>messages</library>
+ * <summary>Sets debug handle status.</summary>
+ * <param name="set">Status to set.</param>
+ * <returns>No specific values.</returns>
+ */
 stock void: Text_Debug(bool: set)
 {
     Logger_ToggleDebug("__TEXT_DEBUG", set);
     Text_DebugLevel = set;
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Sets configuration status.</summary>
+ * <param name="config">Configuration value.</param>
+ * <param name="value">Status to set.</param>
+ * <returns>No specific values.</returns>
+ */
 stock void: Text_SetConfiguration(TEXT_CONFIG: config, bool: value)
 {
     Text_BooleanConfig[config] = value;
 }
 
+/** 
+ * <library>messages</library>
+ * <summary>Gets configuration status.</summary>
+ * <param name="config">Configuration.</param>
+ * <returns>True if configuration is on, otherwise false.</returns>
+ */
 stock bool: Text_GetConfiguration(TEXT_CONFIG: config)
 {
     return Text_BooleanConfig[config];
@@ -128,6 +147,13 @@ stock bool: Text_GetConfiguration(TEXT_CONFIG: config)
 // --
 
 /* Private messages are meant to be sent by a player for a certain player and is only visible by player who received the message. */
+
+/** 
+ * <library>messages</library>
+ * <summary> Chceks if a player can receive private messages. </summary>
+ * <param name="playerid">Player to check.</param>
+ * <returns>True if can, false if can't or non connected.</returns>
+ */
 stock bool: Message_CanPlayerReceivePrivate(playerid)
 {
 	if(!IsPlayerConnected(playerid))
@@ -138,6 +164,17 @@ stock bool: Message_CanPlayerReceivePrivate(playerid)
     return (GetPVarInt(playerid, "__TEXT_Receive") == 0 ? true : false);
 }
 
+/** 
+ * <library>messages</library>
+ * <summary> Blocks player's receiving of private messages. </summary>
+ * <param name="playerid">Player to block receiving.</param>
+ * <param name="block">Status.</param>
+ * <returns>
+        Error code 1 if player is not connected.
+        Error code 2 if modifying private message status is blocked.
+        0 if success.
+    </returns>
+ */
 stock Error: Message_BlockPrivate(playerid, bool: block)
 {
 	if(!IsPlayerConnected(playerid))
@@ -147,13 +184,19 @@ stock Error: Message_BlockPrivate(playerid, bool: block)
 	}
     if(!Text_BooleanConfig[TEXT_CONFIG_ALLOW_PM_STATUS])
     {
-        Logger_Dbg("__TEXT_DEBUG", "Player tried to bloc PMs.", Logger_I("playerid", playerid), Logger_S("player", ReturnPlayerName(playerid)));
+        Logger_Dbg("__TEXT_DEBUG", "Player tried to block PMs.", Logger_I("playerid", playerid), Logger_S("player", ReturnPlayerName(playerid)));
         return Error(2, "Modifying private message status is not allowed.");
     }
 	SetPVarInt(playerid, "__TEXT_Receive", (block ? true : false));
     return Ok();
 }
 
+/** 
+ * <library>messages</library>
+ * <summary> Allows a player to send private messages. </summary>
+ * <param name="playerid">Player to allow.</param>
+ * <returns>True if executed successfully, otherwise false (player not connected).</returns>
+ */
 stock bool: Message_AllowPlayerPrivate(playerid, bool: allow)
 {
 	if(!IsPlayerConnected(playerid))
@@ -165,6 +208,12 @@ stock bool: Message_AllowPlayerPrivate(playerid, bool: allow)
     return true;
 }
 
+/** 
+ * <library>messages</library>
+ * <summary> Chceks if a player can send private messages. </summary>
+ * <param name="playerid">Player to check.</param>
+ * <returns>True if can, false if can't or non connected.</returns>
+ */
 stock bool: Message_CanPlayerSendPrivate(playerid)
 {
 	if(!IsPlayerConnected(playerid))
@@ -175,6 +224,15 @@ stock bool: Message_CanPlayerSendPrivate(playerid)
     return (GetPVarInt(playerid, "__TEXT_AllowPrivate") == 1 ? true : false);
 }
 
+/** 
+ * <library>messages</library>
+ * <summary> Sends a private message to player. </summary>
+ * <param name="playerid">Sender.</param>
+ * <param name="forplayerid">Receiver</param>
+ * <param name="color">Message color. </param>
+ * <param name="text">Message text. </param>
+ * <returns>SendClientMessage Values</returns>
+ */
 stock Error: Message_SendPrivate(playerid, forplayerid, color, const string: text[110])
 {
     if(!IsPlayerConnected(forplayerid))
