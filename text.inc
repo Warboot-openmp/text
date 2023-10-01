@@ -639,7 +639,7 @@ stock bool: ChatGroup_Delete(ChatGroup: id)
     }
     strdel(ChatGroup_Name[id], 0, strlen(ChatGroup_Name[id]));
     Iter_Clear(ChatGroup_Members[id]);
-    Iter_Remove(Chat_Groups, id);
+    Iter_Remove(Chat_Groups, _:id);
     return true;
 }
 
