@@ -702,7 +702,7 @@ stock Error: ChatGroup_RemoveMember(ChatGroup: id, playerid)
  * <param name="message">Message to send.</param>
  * <returns>False if group is invalid, otherwise true.</returns>
  */
-stock bool: ChatGroup_SendMessage(ChatGroup: id, color, const string: message[144])
+stock bool: ChatGroup_SendMessage(ChatGroup: id, color, const string: message[144], OPEN_MP_TAGS: ...)
 {
     if(!ChatGroup_IsValid(id))
     {
@@ -711,7 +711,7 @@ stock bool: ChatGroup_SendMessage(ChatGroup: id, color, const string: message[14
     }
     foreach(new i : ChatGroup_Members[id])
     {
-        SendClientMessage(i, color, message);
+        SendClientMessage(i, color, message, ___(3));
     }
     return true;
 }
